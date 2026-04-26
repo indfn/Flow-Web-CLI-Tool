@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cli-web-flow"
+version = "0.1.0"
+description = "CLI tool for automating image generation on Google Labs Flow"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Your Name" }
+]
+dependencies = [
+  "click",
+  "playwright",
+  "playwright-stealth",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-playwright",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cli_web_flow*"]
+
+[project.scripts]
+cli-web-flow = "cli_web_flow.cli:cli"

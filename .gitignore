@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Project specific
+.cli-web-flow/
+cookies.json
+CurrentSessionPlans/
+FlowCLI_docs/
+inject_cookies.py
+TESTING_LOG.md
+00-REVIEW-FIX.md
+pre-testing_review.md
+TestingPlan.md
+AGENTS.md
+graphify-out/
+cli-anything-web/
+
+# Debug/Temp files
+*.png
+*.html
+*.txt
+diagnostic_*.py
+headed_mapping_*.py
+map_*.py
+test_*.py
+debug_*.py
+inspect_*.py
+final_auth_check.py
+robust_mapping.py
+manual_headed_mapping.py
+
+# Distribution
+dist/
+build/
+*.egg-info/
+.editable/
