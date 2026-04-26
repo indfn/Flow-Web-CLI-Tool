@@ -1,6 +1,6 @@
 # cli-web-flow
 
-A command-line tool that automates image generation and Image-to-Image editing on Google Labs Flow. Manages authentication through injected cookies and provides a robust interface for terminal-based AI creation.
+A command-line tool that automates image generation and Image-to-Image editing on Google Labs Flow. Manages authentication through injected cookies and provides a robust interface for terminal-based creation.
 
 ## Prerequisites
 
@@ -11,19 +11,10 @@ A command-line tool that automates image generation and Image-to-Image editing o
 
 ## Installation
 
-### Quick Install
-
-```bash
-git clone https://github.com/YOUR_USERNAME/cli-web-flow.git
-cd cli-web-flow
-pip install .
-playwright install msedge
-```
-
 ### Option 1: pipx (Recommended for global CLI tools)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/cli-web-flow.git
+git clone https://github.com/indfn/Flow-Web-CLI-Tool.git
 cd cli-web-flow
 pipx install .
 playwright install msedge
@@ -32,7 +23,7 @@ playwright install msedge
 ### Option 2: uv (Fast alternative)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/cli-web-flow.git
+git clone https://github.com/indfn/Flow-Web-CLI-Tool.git
 cd cli-web-flow
 uv pip install .
 playwright install msedge
@@ -41,7 +32,7 @@ playwright install msedge
 ### Option 3: Development Install (with venv)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/cli-web-flow.git
+git clone https://github.com/indfn/Flow-Web-CLI-Tool.git
 cd cli-web-flow
 python3 -m venv venv
 source venv/bin/activate
