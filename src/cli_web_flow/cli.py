@@ -96,12 +96,11 @@ def list_images():
 
 @cli.command()
 @click.option("--prompt", required=True, help="Text prompt for image generation")
-@click.option("--ratio", required=True, help="Aspect ratio (e.g. 16:9)")
-@click.option("--model", required=True, help="Model to use")
-@click.option("--count", type=int, default=1, help="Number of images to generate (1-4)")
-@click.option("--upscale", type=click.Choice(["1x", "2x"]), default="1x", help="Upscale level")
+@click.option("--ratio", required=True, type=click.Choice(["1:1", "16:9", "9:16", "4:3", "3:4"]), help="Aspect ratio")
+@click.option("--model", required=True, type=click.Choice(["nanobanana 2", "nanobanana pro", "imagen 4"]), help="Model to use")
+@click.option("--count", default=1, type=click.IntRange(1, 4), help="Number of images to generate (1-4)")
 @click.option("--download-dest", help="Optional path to download the result")
-def generate_image(prompt, ratio, model, count, upscale, download_dest):
+def generate_image(prompt, ratio, model, count, download_dest):
     cookie_path = get_cookie_path()
     project_id = get_project_id()
     if not cookie_path or not project_id:
@@ -117,8 +116,7 @@ def generate_image(prompt, ratio, model, count, upscale, download_dest):
             model=model,
             count=count,
             download_dest=download_dest,
-            project_id=project_id,
-            upscale=upscale
+            project_id=project_id
         )
         click.echo("Generation triggered successfully.")
         
@@ -127,21 +125,19 @@ def generate_image(prompt, ratio, model, count, upscale, download_dest):
                 dest = click.prompt("Please paste the path to download into")
                 
                 # Handle directory paths by appending a default filename
-                if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
-                    os.makedirs(dest, exist_ok=True)
-                    dest = os.path.join(dest, "generated_image.png")
-                
-                upscale = click.prompt("Upscale level", type=click.Choice(["1x", "2x"]), default="1x")
-                
-                click.echo(f"Downloading {count} image(s) with {upscale} upscale...")
-                for i in range(count):
-                    current_dest = dest
-                    if count > 1:
-                        base, ext = os.path.splitext(dest)
-                        current_dest = f"{base}_{i}{ext}"
-                    
-                    download_image_automation(cookie_path, project_id, str(i), current_dest, upscale)
-                    click.echo(f"Downloaded image {i} to {current_dest}")
+if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
+                os.makedirs(dest, exist_ok=True)
+                dest = os.path.join(dest, "generated_image.png")
+
+            click.echo(f"Downloading {count} image(s)...")
+for i in range(count):
+                current_dest = dest
+                if count > 1:
+                    base, ext = os.path.splitext(dest)
+                    current_dest = f"{base}_{i}{ext}"
+
+                download_image_automation(cookie_path, project_id, str(i), current_dest)
+                click.echo(f"Downloaded image {i} to {current_dest}")
                 
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)
@@ -150,9 +146,9 @@ def generate_image(prompt, ratio, model, count, upscale, download_dest):
 @cli.command()
 @click.option("--image", required=True, help="Local path or Project Image Index")
 @click.option("--prompt", required=True, help="Text prompt")
-@click.option("--ratio", required=True, help="Aspect ratio")
-@click.option("--model", required=True, help="Model to use")
-@click.option("--count", type=int, default=1, help="Number of images to generate (1-4)")
+@click.option("--ratio", required=True, type=click.Choice(["1:1", "16:9", "9:16", "4:3", "3:4"]), help="Aspect ratio")
+@click.option("--model", required=True, type=click.Choice(["nanobanana 2", "nanobanana pro", "imagen 4"]), help="Model to use")
+@click.option("--count", default=1, type=click.IntRange(1, 4), help="Number of images to generate (1-4)")
 @click.option("--download-dest", help="Optional path to download the result")
 def edit_image(image, prompt, ratio, model, count, download_dest):
     cookie_path = get_cookie_path()
@@ -173,42 +169,40 @@ def edit_image(image, prompt, ratio, model, count, download_dest):
         )
         click.echo("Edit triggered successfully.")
         
-        if not download_dest:
-            if click.confirm("Would you like to download the generated image?"):
-                dest = click.prompt("Please paste the path to download into")
-                if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
-                    os.makedirs(dest, exist_ok=True)
-                    dest = os.path.join(dest, "edited_image.png")
-                
-                upscale = click.prompt("Upscale level", type=click.Choice(["1x", "2x"]), default="1x")
-                click.echo(f"Downloading with {upscale} upscale...")
-                
-                # Loop through all generated images
-                for i in range(count):
-                    current_dest = dest
-                    if count > 1:
-                        base, ext = os.path.splitext(dest)
-                        current_dest = f"{base}_{i}{ext}"
-                    
-                    # We use index 0 because the newest ones are usually at the top
-                    # or they shifted. For simplicity we'll try to download the first 'count' images.
-                    download_image_automation(cookie_path, project_id, str(i), current_dest, upscale)
-                    click.echo(f"Downloaded image {i} to {current_dest}")
+if not download_dest:
+        if click.confirm("Would you like to download the generated image?"):
+            dest = click.prompt("Please paste the path to download into")
+            if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
+                os.makedirs(dest, exist_ok=True)
+                dest = os.path.join(dest, "edited_image.png")
+
+            click.echo(f"Downloading {count} image(s)...")
+
+            # Loop through all generated images
+            for i in range(count):
+                current_dest = dest
+                if count > 1:
+                    base, ext = os.path.splitext(dest)
+                    current_dest = f"{base}_{i}{ext}"
+
+                # We use index 0 because the newest ones are usually at the top
+                # or they shifted. For simplicity we'll try to download the first 'count' images.
+                download_image_automation(cookie_path, project_id, str(i), current_dest)
+                click.echo(f"Downloaded image {i} to {current_dest}")
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)
 
 @cli.command()
 @click.option("--image", required=True, help="Project Image Index")
 @click.option("--to-path", required=True, help="Download destination")
-@click.option("--upscale", type=click.Choice(["1x", "2x"]), default="1x")
-def download(image, to_path, upscale):
+def download(image, to_path):
     cookie_path = get_cookie_path()
     project_id = get_project_id()
     if not cookie_path or not project_id:
         click.echo("Error: Not logged in or no project selected.", err=True)
         sys.exit(1)
     try:
-        download_image_automation(cookie_path, project_id, image, to_path, upscale)
+        download_image_automation(cookie_path, project_id, image, to_path)
         click.echo(f"Downloaded to {to_path}")
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)

@@ -244,7 +244,7 @@ def list_images_automation(cookie_path: str, project_id: str) -> List[Dict]:
             return images
     except Exception as e: raise AutomationError(f"Failed to list images: {e}")
 
-def download_image_automation(cookie_path: str, project_id: str, image_index: str, to_path: str, upscale: str) -> None:
+def download_image_automation(cookie_path: str, project_id: str, image_index: str, to_path: str) -> None:
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(channel="msedge", headless=True)
@@ -260,13 +260,8 @@ def download_image_automation(cookie_path: str, project_id: str, image_index: st
             image_elements[idx].click(button="right")
             page.wait_for_timeout(1000)
             download_item = page.locator('[role="menuitem"]:has-text("Download"), button:has-text("Download")').first
-            download_item.hover()
-            page.wait_for_timeout(1000)
-            target_text = "1K" if upscale == "1x" else "2K"
-            target_opt = page.locator(f'button:has-text("{target_text}")').first
             with page.expect_download(timeout=90000) as download_info:
-                if target_opt.count() > 0: target_opt.click()
-                else: download_item.click()
+                download_item.click()
             os.makedirs(os.path.dirname(os.path.abspath(to_path)), exist_ok=True)
             download_info.value.save_as(to_path)
             browser.close()

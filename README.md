@@ -98,16 +98,16 @@ cli-web-flow select-project <project_uuid>
 
 **Generate Image** - Text-to-image generation:
 ```bash
-cli-web-flow generate-image --prompt "A futuristic neon city" --ratio 16:9 --model "nanobanana 2" --count 1 --download-dest "~/Downloads/city.png"
+cli-web-flow generate-image --prompt 'A futuristic neon city' --ratio '16:9' --model 'nanobanana 2' --count 1 --download-dest '~/Downloads/city.png'
 ```
 
 **Edit Image** - Image-to-Image editing:
 ```bash
 # Via local upload
-cli-web-flow edit-image --image "./photo.jpg" --prompt "Add a sunset" --count 1 --download-dest "./result.png"
+cli-web-flow edit-image --image './photo.jpg' --prompt 'Add a sunset' --ratio '16:9' --model 'nanobanana 2' --count 1 --download-dest './result.png'
 
 # Via project index
-cli-web-flow edit-image --image 0 --prompt "Make it 8-bit style" --count 1
+cli-web-flow edit-image --image 0 --prompt 'Make it 8-bit style' --ratio '1:1' --model 'imagen 4' --count 1
 ```
 
 **List Images** - List images in the active project:
@@ -117,7 +117,7 @@ cli-web-flow list-images
 
 **Download** - Explicitly download an existing image:
 ```bash
-cli-web-flow download --image 0 --to-path "./out.png" --upscale 2x
+cli-web-flow download --image 0 --to-path './out.png'
 ```
 
 ## Parameters
