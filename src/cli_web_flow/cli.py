@@ -70,6 +70,7 @@ def list_projects():
             click.echo(f"{p['id']}: {p['name']}")
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 @cli.command()
 @click.argument("project_id")
@@ -93,6 +94,7 @@ def list_images():
             click.echo(f"[{img['index']}] \"{img.get('prompt', 'Unknown')}\" (Ref: {img['ref']})")
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 @cli.command()
 @click.option("--prompt", required=True, help="Text prompt for image generation")
@@ -101,6 +103,9 @@ def list_images():
 @click.option("--count", default=1, type=click.IntRange(1, 4), help="Number of images to generate (1-4)")
 @click.option("--download-dest", help="Optional path to download the result")
 def generate_image(prompt, ratio, model, count, download_dest):
+    if not prompt or not prompt.strip():
+        click.echo("Error: Prompt cannot be empty.", err=True)
+        sys.exit(1)
     cookie_path = get_cookie_path()
     project_id = get_project_id()
     if not cookie_path or not project_id:
@@ -109,36 +114,36 @@ def generate_image(prompt, ratio, model, count, download_dest):
 
     click.echo(f"Generating {count} image(s) in project {project_id}...")
     try:
-        generate_image_automation(
-            cookie_path=cookie_path,
-            prompt=prompt,
-            ratio=ratio,
-            model=model,
-            count=count,
-            download_dest=download_dest,
-            project_id=project_id
-        )
-        click.echo("Generation triggered successfully.")
-        
-        if not download_dest:
-            if click.confirm("Would you like to download the generated images?"):
-                dest = click.prompt("Please paste the path to download into")
-                
-                # Handle directory paths by appending a default filename
-if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
-                os.makedirs(dest, exist_ok=True)
-                dest = os.path.join(dest, "generated_image.png")
+            generate_image_automation(
+                cookie_path=cookie_path,
+                prompt=prompt,
+                ratio=ratio,
+                model=model,
+                count=count,
+                download_dest=download_dest,
+                project_id=project_id
+            )
+            click.echo("Generation triggered successfully.")
 
-            click.echo(f"Downloading {count} image(s)...")
-for i in range(count):
-                current_dest = dest
-                if count > 1:
-                    base, ext = os.path.splitext(dest)
-                    current_dest = f"{base}_{i}{ext}"
+            if not download_dest:
+                if click.confirm("Would you like to download the generated images?"):
+                    dest = click.prompt("Please paste the path to download into")
 
-                download_image_automation(cookie_path, project_id, str(i), current_dest)
-                click.echo(f"Downloaded image {i} to {current_dest}")
-                
+                    # Handle directory paths by appending a default filename
+                    if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
+                        os.makedirs(dest, exist_ok=True)
+                        dest = os.path.join(dest, "generated_image.png")
+
+                    click.echo(f"Downloading {count} image(s)...")
+                    for i in range(count):
+                        current_dest = dest
+                        if count > 1:
+                            base, ext = os.path.splitext(dest)
+                            current_dest = f"{base}_{i}{ext}"
+
+                        download_image_automation(cookie_path, project_id, str(i), current_dest)
+                        click.echo(f"Downloaded image {i} to {current_dest}")
+
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -151,6 +156,9 @@ for i in range(count):
 @click.option("--count", default=1, type=click.IntRange(1, 4), help="Number of images to generate (1-4)")
 @click.option("--download-dest", help="Optional path to download the result")
 def edit_image(image, prompt, ratio, model, count, download_dest):
+    if not prompt or not prompt.strip():
+        click.echo("Error: Prompt cannot be empty.", err=True)
+        sys.exit(1)
     cookie_path = get_cookie_path()
     project_id = get_project_id()
     if not cookie_path or not project_id:
@@ -158,39 +166,41 @@ def edit_image(image, prompt, ratio, model, count, download_dest):
         sys.exit(1)
     try:
         edit_image_automation(
-            cookie_path=cookie_path, 
-            project_id=project_id, 
-            image_ref=image, 
-            prompt=prompt, 
-            ratio=ratio, 
+            cookie_path=cookie_path,
+            project_id=project_id,
+            image_ref=image,
+            prompt=prompt,
+            ratio=ratio,
             model=model,
             count=count,
             download_dest=download_dest
         )
         click.echo("Edit triggered successfully.")
-        
-if not download_dest:
-        if click.confirm("Would you like to download the generated image?"):
-            dest = click.prompt("Please paste the path to download into")
-            if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
-                os.makedirs(dest, exist_ok=True)
-                dest = os.path.join(dest, "edited_image.png")
 
-            click.echo(f"Downloading {count} image(s)...")
+        if not download_dest:
+            if click.confirm("Would you like to download the generated image?"):
+                dest = click.prompt("Please paste the path to download into")
+                if os.path.isdir(dest) or dest.endswith('/') or dest.endswith('\\'):
+                    os.makedirs(dest, exist_ok=True)
+                    dest = os.path.join(dest, "edited_image.png")
 
-            # Loop through all generated images
-            for i in range(count):
-                current_dest = dest
-                if count > 1:
-                    base, ext = os.path.splitext(dest)
-                    current_dest = f"{base}_{i}{ext}"
+                click.echo(f"Downloading {count} image(s)...")
 
-                # We use index 0 because the newest ones are usually at the top
-                # or they shifted. For simplicity we'll try to download the first 'count' images.
-                download_image_automation(cookie_path, project_id, str(i), current_dest)
-                click.echo(f"Downloaded image {i} to {current_dest}")
+                # Loop through all generated images
+                for i in range(count):
+                    current_dest = dest
+                    if count > 1:
+                        base, ext = os.path.splitext(dest)
+                        current_dest = f"{base}_{i}{ext}"
+
+                    # We use index 0 because the newest ones are usually at the top
+                    # or they shifted. For simplicity we'll try to download the first 'count' images.
+                    download_image_automation(cookie_path, project_id, str(i), current_dest)
+                    click.echo(f"Downloaded image {i} to {current_dest}")
+
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 @cli.command()
 @click.option("--image", required=True, help="Project Image Index")
@@ -206,6 +216,7 @@ def download(image, to_path):
         click.echo(f"Downloaded to {to_path}")
     except AutomationError as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     cli()

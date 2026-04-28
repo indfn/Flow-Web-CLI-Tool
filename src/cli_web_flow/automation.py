@@ -4,22 +4,70 @@ import time
 import os
 import logging
 from typing import Optional, List, Dict
-from playwright.sync_api import sync_playwright, Page, BrowserContext
+from playwright.sync_api import sync_playwright, Page, BrowserContext, Error as PlaywrightError
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://labs.google/fx/tools/flow"
 
+__all__ = [
+    "generate_image_automation",
+    "create_project_automation",
+    "list_projects_automation",
+    "list_images_automation",
+    "edit_image_automation",
+    "download_image_automation",
+    "verify_auth_automation",
+    "AutomationError",
+]
+
 class AutomationError(Exception):
     pass
+
+def _map_model_name(model: str) -> str:
+    target_model = model.lower()
+    if "pro" in target_model:
+        return "Nano Banana Pro"
+    elif "2" in target_model:
+        return "Nano Banana 2"
+    elif "imagen" in target_model:
+        return "Imagen 4"
+    return model
+
+def _get_browser(p):
+    try:
+        return p.chromium.launch(channel="msedge", headless=True)
+    except Exception as e:
+        logger.debug(f"Edge not available: {e}")
+        try:
+            return p.chromium.launch(headless=True)
+        except Exception:
+            raise AutomationError(
+                "Neither MS Edge nor Chromium is available. "
+                "Please install Edge with: playwright install msedge"
+            )
+
+def _validate_download_path(path: str, base_dir: Optional[str] = None) -> str:
+    abs_dest = os.path.abspath(path)
+    if os.path.isabs(path):
+        return path
+    if base_dir is None:
+        base_dir = os.getcwd()
+    abs_base = os.path.abspath(base_dir)
+    if not abs_dest.startswith(abs_base):
+        raise AutomationError(
+            f"Path traversal detected: '{path}' resolves to '{abs_dest}' which is outside "
+            f"the allowed directory '{abs_base}'. Use an absolute path like '/home/user/downloads/file.png' "
+            f"or run the CLI from the directory where you want to save files."
+        )
+    return path
 
 def _load_cookies(context: BrowserContext, cookie_path: str) -> None:
     try:
         with open(cookie_path, 'r') as f:
             cookies = json.load(f)
-        
+
         context.clear_cookies()
         processed_cookies = []
         for cookie in cookies:
@@ -36,9 +84,9 @@ def _load_cookies(context: BrowserContext, cookie_path: str) -> None:
                 continue
             if ":" in c['domain']:
                 c['domain'] = c['domain'].split(":")[0]
-            
+
             processed_cookies.append(c)
-        
+
         context.add_cookies(processed_cookies)
     except Exception as e:
         raise AutomationError(f"Failed to load cookies from {cookie_path}: {e}")
@@ -59,7 +107,7 @@ def generate_image_automation(
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=True)
+            browser = _get_browser(p)
             context = browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
@@ -81,7 +129,8 @@ def generate_image_automation(
                     if btn.is_visible():
                         btn.click(timeout=2000)
                         page.wait_for_timeout(500)
-                except: pass
+                except (PlaywrightError, Exception) as e:
+                    logger.debug(f"Button click skipped: {e}")
 
             # --- Settings Adjustment ---
             settings_btn = page.locator('button:has-text("Nano Banana"), button:has-text("Imagen"), button:has-text("Genie")').first
@@ -89,45 +138,44 @@ def generate_image_automation(
                 settings_btn.click()
                 page.wait_for_timeout(2000)
 
-                # Set Model
-                model_dropdown = page.locator('button:has-text("arrow_drop_down")').first
-                if model_dropdown.count() > 0:
-                    model_dropdown.click()
-                    page.wait_for_timeout(1000)
-                    target_model = model.lower()
-                    target_text = "Nano Banana Pro" if "pro" in target_model else "Nano Banana 2" if "2" in target_model else "Imagen 4" if "imagen" in target_model else model
-                    opt = page.locator(f'button:has-text("{target_text}"), [role="option"]:has-text("{target_text}")').first
-                    if opt.count() > 0:
-                        opt.click(force=True)
-                        page.wait_for_timeout(1000)
-                    else: page.keyboard.press("Escape")
-
-                # Set Ratio
-                if ratio:
-                    ratio_btn = page.locator(f'button:has-text("{ratio}"), [role="tab"]:has-text("{ratio}"), [role="button"]:has-text("{ratio}")').first
-                    if ratio_btn.count() > 0:
-                        ratio_btn.click(force=True)
-                        page.wait_for_timeout(1000)
-
-                # Set Count
-                target_count_text = f"x{count}"
-                count_btn = page.locator(f'button:has-text("{target_count_text}")').first
-                if count_btn.count() > 0:
-                    count_btn.click(force=True)
-                    page.wait_for_timeout(1000)
-                
-                settings_btn.click() # Close settings
+            # Set Model
+            model_dropdown = page.locator('button:has-text("arrow_drop_down")').first
+            if model_dropdown.count() > 0:
+                model_dropdown.click()
                 page.wait_for_timeout(1000)
-                page.keyboard.press("Escape")
+                target_text = _map_model_name(model)
+                opt = page.locator(f'button:has-text("{target_text}"), [role="option"]:has-text("{target_text}")').first
+                if opt.count() > 0:
+                    opt.click(force=True)
+                    page.wait_for_timeout(1000)
+                else: page.keyboard.press("Escape")
+
+            # Set Ratio
+            if ratio:
+                ratio_btn = page.locator(f'button:has-text("{ratio}"), [role="tab"]:has-text("{ratio}"), [role="button"]:has-text("{ratio}")').first
+                if ratio_btn.count() > 0:
+                    ratio_btn.click(force=True)
+                    page.wait_for_timeout(1000)
+
+            # Set Count
+            target_count_text = f"x{count}"
+            count_btn = page.locator(f'button:has-text("{target_count_text}")').first
+            if count_btn.count() > 0:
+                count_btn.click(force=True)
+                page.wait_for_timeout(1000)
+
+            settings_btn.click() # Close settings
+            page.wait_for_timeout(1000)
+            page.keyboard.press("Escape")
 
             # --- Prompt & Generation ---
             prompt_input = page.locator('[role="textbox"]').first
             prompt_input.wait_for(state="visible", timeout=15000)
-            
+
             existing_images = page.locator('img[alt="Generated image"]').all()
             existing_srcs = {img.get_attribute("src") for img in existing_images if img.get_attribute("src")}
             existing_count = len(existing_images)
-            
+
             prompt_input.click()
             page.keyboard.type(prompt, delay=100)
             page.wait_for_timeout(1000)
@@ -138,12 +186,9 @@ def generate_image_automation(
 
             # Wait
             try:
-                page.locator('text*="Generating", text*="Working", text*="request"').first.wait_for(state="visible", timeout=20000)
-                page.locator('text*="Generating", text*="Working", text*="request"').first.wait_for(state="hidden", timeout=240000)
-            except:
-                try:
-                    page.wait_for_function(f"() => document.querySelectorAll('img[alt=\"Generated image\"]').length > {existing_count}", timeout=120000)
-                except: pass
+                page.wait_for_function(f"() => document.querySelectorAll('img[alt=\"Generated image\"]').length > {existing_count}", timeout=180000)
+            except (PlaywrightError, Exception) as e:
+                logger.warning(f"Image count check also failed: {e}")
 
             # Download
             if download_dest:
@@ -162,11 +207,17 @@ def generate_image_automation(
                             download_item.hover()
                             page.wait_for_timeout(1000)
                             target_opt = page.locator('button:has-text("1K"), button:has-text("Original")').first
-                            local_path = os.path.join(download_dest, f"result_{i}.png") if is_dir else (f"{os.path.splitext(download_dest)[0]}_{i}{os.path.splitext(download_dest)[1]}" if count > 1 else download_dest)
+                            if is_dir:
+                                local_path = os.path.join(os.path.abspath(download_dest), f"result_{i}.png")
+                            elif count > 1:
+                                local_path = f"{os.path.splitext(download_dest)[0]}_{i}{os.path.splitext(download_dest)[1]}"
+                            else:
+                                local_path = download_dest
+                            _validate_download_path(local_path)
                             with page.expect_download(timeout=90000) as download_info:
                                 if target_opt.count() > 0: target_opt.click()
                                 else: download_item.click()
-                            download_info.value.save_as(local_path)
+                                download_info.value.save_as(local_path)
                             logger.info(f"Downloaded result {i} to {local_path}")
                     except Exception as e: logger.error(f"Download failed for {i}: {e}")
 
@@ -178,7 +229,7 @@ def generate_image_automation(
 def create_project_automation(cookie_path: str, name: Optional[str] = None) -> str:
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=True)
+            browser = _get_browser(p)
             context = browser.new_context()
             _load_cookies(context, cookie_path)
             page = context.new_page()
@@ -196,7 +247,7 @@ def create_project_automation(cookie_path: str, name: Optional[str] = None) -> s
 def list_projects_automation(cookie_path: str) -> List[Dict[str, str]]:
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=True)
+            browser = _get_browser(p)
             context = browser.new_context()
             _load_cookies(context, cookie_path)
             page = context.new_page()
@@ -221,13 +272,13 @@ def list_projects_automation(cookie_path: str) -> List[Dict[str, str]]:
 def list_images_automation(cookie_path: str, project_id: str) -> List[Dict]:
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=True)
+            browser = _get_browser(p)
             context = browser.new_context()
             _load_cookies(context, cookie_path)
             page = context.new_page()
             page.goto(f"{BASE_URL}/project/{project_id}", wait_until="networkidle")
             try: page.locator('img[alt="Generated image"]').first.wait_for(state="visible", timeout=15000)
-            except: pass
+            except (PlaywrightError, Exception) as e: logger.debug(f"Image wait failed: {e}")
             image_elements = page.locator('img[alt="Generated image"]').all()
             images = []
             for i, img in enumerate(image_elements):
@@ -238,7 +289,7 @@ def list_images_automation(cookie_path: str, project_id: str) -> List[Dict]:
                     try:
                         card = img.locator('xpath=./ancestor::div[contains(@class, "card") or contains(@style, "background")][1]')
                         if card.count() > 0: prompt_text = card.inner_text().split("\n")[0].strip()
-                    except: pass
+                    except (PlaywrightError, Exception) as e: logger.debug(f"Card lookup failed: {e}")
                 images.append({"index": str(i), "ref": ref, "url": src, "prompt": prompt_text})
             browser.close()
             return images
@@ -246,41 +297,54 @@ def list_images_automation(cookie_path: str, project_id: str) -> List[Dict]:
 
 def download_image_automation(cookie_path: str, project_id: str, image_index: str, to_path: str) -> None:
     try:
+        _validate_download_path(to_path)
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=True)
-            context = browser.new_context()
+            browser = _get_browser(p)
+            context = browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+            )
+            context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             _load_cookies(context, cookie_path)
             page = context.new_page()
             page.goto(f"{BASE_URL}/project/{project_id}", wait_until="networkidle")
             try: page.locator('img[alt="Generated image"]').first.wait_for(state="visible", timeout=15000)
-            except: pass
+            except (PlaywrightError, Exception) as e: logger.debug(f"Image wait failed: {e}")
             image_elements = page.locator('img[alt="Generated image"]').all()
             idx = int(image_index)
             if idx >= len(image_elements): raise AutomationError(f"Index {idx} out of range.")
             image_elements[idx].click(button="right")
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1500)
             download_item = page.locator('[role="menuitem"]:has-text("Download"), button:has-text("Download")').first
+            download_item.hover()
+            page.wait_for_timeout(1000)
             with page.expect_download(timeout=90000) as download_info:
-                download_item.click()
-            os.makedirs(os.path.dirname(os.path.abspath(to_path)), exist_ok=True)
-            download_info.value.save_as(to_path)
+                target_1k = page.locator('button:has-text("1K")').first
+                if target_1k.count() > 0:
+                    target_1k.click()
+                else:
+                    download_item.click()
+                download_info.value.save_as(to_path)
+            logger.info(f"Downloaded image {idx} to {to_path}")
             browser.close()
     except Exception as e: raise AutomationError(f"Failed to download image: {e}")
 
 def verify_auth_automation(cookie_path: str) -> bool:
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=True)
+            browser = _get_browser(p)
             context = browser.new_context()
             _load_cookies(context, cookie_path)
             page = context.new_page()
             page.goto(BASE_URL, wait_until="networkidle")
             try: page.locator('button:has-text("Sign in"), button:has-text("Create")').first.wait_for(state="visible", timeout=10000)
-            except: pass
+            except (PlaywrightError, Exception) as e: logger.debug(f"Sign-in button wait failed: {e}")
             is_logged_in = "fx/tools/flow" in page.url and not page.locator('button:has-text("Sign in")').is_visible()
             browser.close()
             return is_logged_in
-    except: return False
+    except Exception as e:
+        logger.error(f"Auth verification failed: {e}")
+        return False
 
 def edit_image_automation(
     cookie_path: str,
@@ -294,7 +358,7 @@ def edit_image_automation(
 ) -> None:
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=True)
+            browser = _get_browser(p)
             context = browser.new_context(viewport={'width': 1920, 'height': 1080}, user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
             context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             _load_cookies(context, cookie_path)
@@ -308,59 +372,48 @@ def edit_image_automation(
             if settings_btn.count() > 0:
                 settings_btn.click()
                 page.wait_for_timeout(2000)
-                
-                # Model
-                model_dropdown = page.locator('button:has-text("arrow_drop_down")').first
-                if model_dropdown.count() > 0:
-                    model_dropdown.click()
-                    page.wait_for_timeout(1000)
-                    target_model = model.lower()
-                    target_text = "Nano Banana Pro" if "pro" in target_model else "Nano Banana 2" if "2" in target_model else "Imagen 4" if "imagen" in target_model else model
-                    opt = page.locator(f'button:has-text("{target_text}"), [role="option"]:has-text("{target_text}")').first
-                    if opt.count() > 0:
-                        opt.click(force=True)
-                        page.wait_for_timeout(1000)
-                    else: page.keyboard.press("Escape")
 
-                # Ratio
-                if ratio:
-                    ratio_btn = page.locator(f'button:has-text("{ratio}"), [role="tab"]:has-text("{ratio}"), [role="button"]:has-text("{ratio}")').first
-                    if ratio_btn.count() > 0:
-                        ratio_btn.click(force=True)
-                        page.wait_for_timeout(1000)
-
-                # Count
-                target_count_text = f"x{count}"
-                count_btn = page.locator(f'button:has-text("{target_count_text}")').first
-                if count_btn.count() > 0:
-                    count_btn.click(force=True)
-                    page.wait_for_timeout(1000)
-                
-                settings_btn.click()
+            # Model
+            model_dropdown = page.locator('button:has-text("arrow_drop_down")').first
+            if model_dropdown.count() > 0:
+                model_dropdown.click()
                 page.wait_for_timeout(1000)
-                # Removed the aggressive Escape here that might be hiding the prompt bar
+                target_text = _map_model_name(model)
+                opt = page.locator(f'button:has-text("{target_text}"), [role="option"]:has-text("{target_text}")').first
+                if opt.count() > 0:
+                    opt.click(force=True)
+                    page.wait_for_timeout(1000)
+                else: page.keyboard.press("Escape")
 
-            # Blacklist existing images
+            # Ratio
+            if ratio:
+                ratio_btn = page.locator(f'button:has-text("{ratio}"), [role="tab"]:has-text("{ratio}"), [role="button"]:has-text("{ratio}")').first
+                if ratio_btn.count() > 0:
+                    ratio_btn.click(force=True)
+                    page.wait_for_timeout(1000)
+
+            # Count
+            target_count_text = f"x{count}"
+            count_btn = page.locator(f'button:has-text("{target_count_text}")').first
+            if count_btn.count() > 0:
+                count_btn.click(force=True)
+                page.wait_for_timeout(1000)
+
+            settings_btn.click()
+            page.wait_for_timeout(1000)
+
             initial_srcs = {img.get_attribute("src") for img in page.locator('img[alt="Generated image"]').all() if img.get_attribute("src")}
 
             # --- ATTACHMENT ---
             if os.path.isfile(image_ref):
                 logger.info(f"Uploading file via Plus menu: {image_ref}")
-                
-                # 1. Capture initial count BEFORE upload
                 initial_count = page.locator('img[alt="Generated image"]').count()
-                
-                # 2. Click Plus button and Upload
                 page.locator('button:has(i:has-text("add_2"))').first.click()
                 page.wait_for_timeout(2000)
-                
-                # Click Upload
                 upload_target = page.locator('div[data-radix-popper-content-wrapper] div:has-text("Upload image")').last
                 with page.expect_file_chooser() as fc_info:
                     upload_target.click()
-                fc_info.value.set_files(image_ref)
-                
-                # 3. CRITICAL: Wait for image count to increase BY 1
+                    fc_info.value.set_files(image_ref)
                 logger.info("Waiting for asset to fully attach to project...")
                 try:
                     page.wait_for_function(
@@ -371,10 +424,8 @@ def edit_image_automation(
                     logger.info(f"Asset attached successfully. New count: {attached_count} (Expected: {initial_count + 1})")
                 except Exception as e:
                     logger.warning(f"Timed out waiting for asset attachment: {e}")
-                page.wait_for_timeout(3000)
+                    page.wait_for_timeout(3000)
             else:
-
-                # [Selecting from project via Plus Menu]
                 idx = int(image_ref)
                 page.locator('button:has(i:has-text("add_2"))').first.click()
                 page.wait_for_timeout(3000)
@@ -385,11 +436,8 @@ def edit_image_automation(
                     page.keyboard.press("Escape")
                     image_elements = page.locator('img[alt="Generated image"]').all()
                     image_elements[idx].click()
-                    page.locator('button:has-text("Create"), button:has-text("arrow_forward")').last.click()
+                page.locator('button:has-text("Create"), button:has-text("arrow_forward")').last.click()
 
-
-            # --- PRE-GENERATION STATE ---
-            # Capture everything now, including the newly attached asset
             final_pre_gen_images = page.locator('img[alt="Generated image"]').all()
             final_blacklist = {img.get_attribute("src") for img in final_pre_gen_images if img.get_attribute("src")}
             existing_count = len(final_pre_gen_images)
@@ -406,39 +454,24 @@ def edit_image_automation(
 
             # --- WAIT ---
             try:
-                # Fixed selector syntax: use :has-text() instead of text*=
-                page.locator(':has-text("Generating"), :has-text("Working"), :has-text("request")').first.wait_for(state="visible", timeout=20000)
-                page.locator(':has-text("Generating"), :has-text("Working"), :has-text("request")').first.wait_for(state="hidden", timeout=240000)
-                logger.info("Generation indicator detected and completed.")
-            except:
-                logger.info("No generation indicator found, waiting for image count increase...")
-                try:
-                    page.wait_for_function(f"() => {{ const c = document.querySelectorAll('img[alt=\"Generated image\"]').length; return c > {existing_count}; }}", timeout=120000)
-                    logger.info("Image count increased successfully.")
-                except:
-                    logger.warning("Count wait also failed. Proceeding to download anyway.")
-            
+                page.wait_for_function(f"() => {{ const c = document.querySelectorAll('img[alt=\"Generated image\"]').length; return c > {existing_count}; }}", timeout=180000)
+                logger.info("Image count increased successfully.")
+            except (PlaywrightError, Exception) as e:
+                logger.warning(f"Count wait also failed: {e}. Proceeding to download anyway.")
+
             # --- DOWNLOAD ---
             if download_dest:
-                # CRITICAL: Re-scan the gallery AFTER generation completes
-                # The newly generated image appears at the TOP (index 0) of the gallery
                 logger.info("Re-scanning gallery for newly generated images...")
                 page.wait_for_timeout(5000)
-                
-                # Get ALL images currently in the project gallery
                 all_images = page.locator('img[alt="Generated image"]').all()
                 logger.info(f"Found {len(all_images)} total images in gallery")
-                
-                # The NEWEST generated images are at the TOP of the gallery (index 0, 1, 2...)
-                # We want the first 'count' images which are the newly generated ones
                 new_results = all_images[:count]
-                
+
                 if not new_results:
                     logger.error("No images found in gallery to download!")
                     raise AutomationError("No images found to download")
-                
+
                 logger.info(f"Downloading {len(new_results)} newly generated image(s) from top of gallery")
-                
                 is_dir = os.path.isdir(download_dest) if os.path.exists(download_dest) else download_dest.endswith('/')
                 for i in range(min(count, len(new_results))):
                     try:
@@ -449,11 +482,17 @@ def edit_image_automation(
                             download_item.hover()
                             page.wait_for_timeout(1000)
                             target_opt = page.locator('button:has-text("1K"), button:has-text("Original")').first
-                            local_path = os.path.join(download_dest, f"edited_{i}.png") if is_dir else (f"{os.path.splitext(download_dest)[0]}_{i}{os.path.splitext(download_dest)[1]}" if count > 1 else download_dest)
+                            if is_dir:
+                                local_path = os.path.join(os.path.abspath(download_dest), f"edited_{i}.png")
+                            elif count > 1:
+                                local_path = f"{os.path.splitext(download_dest)[0]}_{i}{os.path.splitext(download_dest)[1]}"
+                            else:
+                                local_path = download_dest
+                            _validate_download_path(local_path)
                             with page.expect_download(timeout=90000) as download_info:
                                 if target_opt.count() > 0: target_opt.click()
                                 else: download_item.click()
-                            download_info.value.save_as(local_path)
+                                download_info.value.save_as(local_path)
                             logger.info(f"Downloaded NEW result {i} to {local_path}")
                     except Exception as e: logger.error(f"Download failed: {e}")
 

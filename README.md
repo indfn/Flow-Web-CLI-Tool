@@ -87,28 +87,30 @@ cli-web-flow select-project <project_uuid>
 
 ### Image Operations
 
-**Generate Image** - Text-to-image generation:
+**Generate Image** - Text-to-image generation (the end path for --download-dest can be the name of your downloaded picture):
 ```bash
-cli-web-flow generate-image --prompt 'A futuristic neon city' --ratio '16:9' --model 'nanobanana 2' --count 1 --download-dest '~/Downloads/city.png'
+cli-web-flow generate-image --prompt 'A futuristic neon city' --ratio '16:9' --model 'nanobanana 2' --count 1 --download-dest '/home/user/Downloads/picture_of_city'
 ```
 
 **Edit Image** - Image-to-Image editing:
 ```bash
 # Via local upload
-cli-web-flow edit-image --image './photo.jpg' --prompt 'Add a sunset' --ratio '16:9' --model 'nanobanana 2' --count 1 --download-dest './result.png'
+cli-web-flow edit-image --image '/path/to/image' --prompt 'Add a sunset' --ratio '16:9' --model 'nanobanana 2' --count 1 --download-dest '/home/user/Downloads/sunset'
 
-# Via project index
-cli-web-flow edit-image --image 0 --prompt 'Make it 8-bit style' --ratio '1:1' --model 'imagen 4' --count 1
+# Via project index (only edits the latest picture in the project)
+cli-web-flow edit-image --image 0 --prompt 'Make it 8-bit style' --ratio '1:1' --model 'imagen 4' --count 1 --download-dest '/path/to/download/name'
 ```
 
-**List Images** - List images in the active project:
+Note: edit-image with attatching images via image index (--image x) currently only supports attatching the latest image in the project (--image 0) so any other number will be defaulted to 0.
+
+**List Images** - List images in the active project (returns all image ids in the project, but will also say "No prompt detected" since the website dosen't render the description of an image unless hovered upon):
 ```bash
 cli-web-flow list-images
 ```
 
-**Download** - Explicitly download an existing image:
+**Download** - Explicitly download an existing image (supports all images in the project, with latest being index 0):
 ```bash
-cli-web-flow download --image 0 --to-path './out.png'
+cli-web-flow download --image 0 --to-path '/path/to/download/name'
 ```
 
 ## Parameters
